@@ -581,16 +581,14 @@ static inline VkFFTResult VkFFT_DispatchPlan(VkFFTApplication* app, VkFFTAxis* a
 				}
 				//args[args_id] = &axis->pushConstants;
 				if (axis->pushConstants.structSize > 0) {
-					if (!axis->pushConstants.dataUintBuffer) {
-						axis->pushConstants.dataUintBuffer = app->configuration.device->newBuffer(axis->pushConstants.structSize, MTL::ResourceStorageModeShared);
-						memcpy(axis->pushConstants.dataUintBuffer->contents(), axis->pushConstants.data, axis->pushConstants.structSize);
-						axis->updatePushConstants = 0;
-					}
-					else if (axis->updatePushConstants) {
-						memcpy(axis->pushConstants.dataUintBuffer->contents(), axis->pushConstants.data, axis->pushConstants.structSize);
-						axis->updatePushConstants = 0;
-					}
-					app->configuration.commandEncoder->setBuffer(axis->pushConstants.dataUintBuffer, 0, args_id);
+					// setBytes copies the constants into the command stream at encode
+					// time. A single shared MTLBuffer, rewritten on the CPU before
+					// each dispatch, is read by the GPU only when the command buffer
+					// runs, so every dispatch encoded into the same command buffer
+					// would see the values of the last one (launch-time offsets,
+					// workGroupShift of split dispatches).
+					app->configuration.commandEncoder->setBytes(axis->pushConstants.data, axis->pushConstants.structSize, args_id);
+					axis->updatePushConstants = 0;
 					args_id++;
 				}
 				MTL::Size threadsPerGrid = { dispatchSize[0] * axis->specializationConstants.localSize[0].data.i , dispatchSize[1] * axis->specializationConstants.localSize[1].data.i ,dispatchSize[2] * axis->specializationConstants.localSize[2].data.i };
